@@ -6,7 +6,8 @@
  *
  * Functional parity with the proven thenabbu/srm-auto-login flow:
  * URL-routed stages, robust click selectors, /confirmidentifier handling,
- * wrong-password session halt, multi-account chooser + obfuscation.
+ * wrong-password session halt, Google account-chooser auto-selection
+ * (saved account first, else any SRM session) + password obfuscation.
  */
 (() => {
   'use strict';
@@ -138,9 +139,7 @@
     return '';
   };
 
-  const getPreferredAccount = async () => {
-    const { accounts, activeAccountId } = await loadAccounts();
-    const enabled = accounts.filter((a) => a && a.email && a.password && a.enabled !== false);
+  const pickPreferred = (enabled, activeAccountId) => {
     if (!enabled.length) return null;
 
     const chosenId = sessionStorage.getItem('srm_chosen_id');
@@ -158,6 +157,12 @@
     return enabled.find((a) => a.id === activeAccountId) || enabled[0];
   };
 
+  const getPreferredAccount = async () => {
+    const { accounts, activeAccountId } = await loadAccounts();
+    const enabled = accounts.filter((a) => a && a.email && a.password && a.enabled !== false);
+    return pickPreferred(enabled, activeAccountId);
+  };
+
   const markUsed = (accountId) => {
     browserApi.storage.local.get('srm_accounts', (items) => {
       const accounts = Array.isArray(items.srm_accounts) ? items.srm_accounts : [];
@@ -167,6 +172,57 @@
         browserApi.storage.local.set({ srm_accounts: accounts });
       }
     });
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Account Chooser detection & auto-selection.
+   * Google's "Choose an account" screen lists signed-out accounts in
+   * cards carrying data-identifier / data-email or the email in text.
+   * ------------------------------------------------------------------ */
+  const CHOOSER_SELECTORS = ['[data-identifier]', '.W7322c', '[role="link"]', 'li'];
+
+  const findAccountChooserItem = (email) => {
+    const normalized = normalizeEmail(email);
+    const netId = normalized.replace('@srmist.edu.in', '');
+
+    for (const sel of CHOOSER_SELECTORS) {
+      for (const el of document.querySelectorAll(sel)) {
+        const dataId = el.getAttribute('data-identifier') || '';
+        const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+        const haystack = `${dataId} ${text}`.toLowerCase();
+        if (!haystack.includes('srmist.edu.in')) continue;
+
+        if (dataId && normalizeEmail(dataId) === normalized) return el;
+        if (netId && haystack.includes(netId)) return el;
+      }
+    }
+    return null;
+  };
+
+  // First chooser card that carries an SRM-domain session (no saved match).
+  const findFirstSrmChooserItem = () => {
+    for (const sel of CHOOSER_SELECTORS) {
+      for (const el of document.querySelectorAll(sel)) {
+        const dataId = el.getAttribute('data-identifier') || '';
+        const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+        if (`${dataId} ${text}`.toLowerCase().includes('srmist.edu.in')) return el;
+      }
+    }
+    return null;
+  };
+
+  // Click that survives Google's custom UI handlers (click + Enter keys).
+  const nativeClick = (el) => {
+    try {
+      el.click();
+    } catch (_) {}
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    el.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13
+    }));
+    el.dispatchEvent(new KeyboardEvent('keyup', {
+      bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13
+    }));
   };
 
   /* ------------------------------------------------------------------ *
@@ -191,17 +247,33 @@
 
   const handleEmailStep = async () => {
     if (isHalted()) return;
-    const { accounts } = await loadAccounts();
+    const { accounts, activeAccountId } = await loadAccounts();
     const enabled = accounts.filter((a) => a.enabled !== false && a.email && a.password);
     if (!enabled.length) return;
 
-    if (enabled.length >= 2) {
-      showAccountChooser(enabled, async (account) => {
-        sessionStorage.setItem('srm_chosen_id', account.id);
-        await fillEmail(account);
-      });
+    // Wait for either the login form or Google's "Choose an account" screen.
+    const first = await waitForSelector('input[type="email"], [data-identifier], .W7322c');
+    if (!first || isHalted()) return;
+
+    // Google "Choose an account" screen: auto-select the preferred saved account.
+    const preferred = pickPreferred(enabled, activeAccountId);
+    if (preferred) {
+      const item = findAccountChooserItem(preferred.email);
+      if (item) {
+        nativeClick(item);
+        toast('Signing in...');
+        return;
+      }
+    }
+
+    // Saved account not listed -> use the first available SRM session.
+    const anySrm = findFirstSrmChooserItem();
+    if (anySrm) {
+      nativeClick(anySrm);
+      toast('Signing in...');
       return;
     }
+
     await fillEmail(enabled[0]);
   };
 
@@ -260,6 +332,8 @@
       url.includes('/identifier') ||
       url.includes('/signin/v2/identifier') ||
       url.includes('/v3/signin/identifier') ||
+      url.includes('/ServiceLogin') ||
+      url.includes('/InteractiveLogin') ||
       BARE_LOGIN_URL.test(url)
     ) {
       handleEmailStep();
@@ -295,41 +369,6 @@
       el.style.opacity = '0';
       setTimeout(() => el.remove(), 200);
     }, 2500);
-  };
-
-  const showAccountChooser = (accounts, onSelect) => {
-    document.getElementById('srm-ac-chooser')?.remove();
-    const wrap = document.createElement('div');
-    wrap.id = 'srm-ac-chooser';
-    wrap.style.cssText =
-      'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
-      'background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:12px;' +
-      'min-width:220px;box-shadow:0 6px 20px rgba(0,0,0,.4);' +
-      'font:12px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;' +
-      'display:flex;flex-direction:column;gap:8px';
-
-    const title = document.createElement('div');
-    title.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#999';
-    title.textContent = 'Select SRM account';
-    wrap.appendChild(title);
-
-    accounts.forEach((account) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = account.email;
-      btn.style.cssText =
-        'background:#1b1b1b;border:1px solid #333;border-radius:4px;color:#ddd;' +
-        'padding:8px 10px;font:inherit;text-align:left;cursor:pointer';
-      btn.onmouseenter = () => (btn.style.borderColor = '#666');
-      btn.onmouseleave = () => (btn.style.borderColor = '#333');
-      btn.onclick = () => {
-        wrap.remove();
-        onSelect(account);
-      };
-      wrap.appendChild(btn);
-    });
-
-    document.body.appendChild(wrap);
   };
 
   /* ------------------------------------------------------------------ *
