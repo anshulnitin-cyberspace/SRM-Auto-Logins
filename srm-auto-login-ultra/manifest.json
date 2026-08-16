@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "SRM Auto Login Ultra",
+  "version": "1.0",
+  "description": "Hyper-fast, lightweight auto-login extension for SRM Google Accounts.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://accounts.google.com/*",
+        "https://*.srmist.edu.in/*",
+        "https://sp.srmist.edu.in/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SRM Auto Login Ultra</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #ffffff;
+      color: #1f2328;
+    }
+    h1 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      letter-spacing: -0.01em;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      margin: 10px 0 4px;
+      color: inherit;
+    }
+    input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      color: inherit;
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    input:focus {
+      border-color: #0969da;
+      box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.25);
+    }
+    #saveBtn {
+      width: 100%;
+      margin-top: 14px;
+      padding: 9px 0;
+      border: none;
+      border-radius: 6px;
+      background: #0969da;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    #saveBtn:hover { background: #0958c9; }
+    #status {
+      min-height: 16px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #1a7f37;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    .note {
+      margin-top: 12px;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #656d76;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0d1117; color: #e6edf3; }
+      input {
+        background: #161b22;
+        border-color: #30363d;
+      }
+      .note { color: #8b949e; }
+    }
+  </style>
+</head>
+<body>
+  <h1>SRM Auto Login Ultra</h1>
+  <form id="credForm" novalidate>
+    <label for="username">NetID or SRM Email</label>
+    <input id="username" type="text" placeholder="NetID or SRM Email (e.g., ab1234)"
+           autocomplete="username" spellcheck="false" autocapitalize="off">
+    <label for="password">Password</label>
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="saveBtn" type="button">Save Credentials</button>
+  </form>
+  <div id="status" role="status" aria-live="polite"></div>
+  <p class="note">Credentials are stored locally on this device only.</p>
+  <script src="popup.js"></script>
+</body>
+</html>
