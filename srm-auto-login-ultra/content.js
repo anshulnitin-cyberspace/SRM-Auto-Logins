@@ -340,12 +340,8 @@
     if (isHalted()) return;
     const { accounts, activeAccountId } = await loadAccounts();
     const enabled = accounts.filter((a) => a.enabled !== false && a.email && a.password);
-    if (!enabled.length) {
-      console.log('[SRM-Auto] email step: no enabled saved accounts');
-      return;
-    }
+    if (!enabled.length) return;
     const preferred = pickPreferred(enabled, activeAccountId);
-    console.log('[SRM-Auto] email step on', location.href, '| preferred:', preferred && preferred.email);
 
     // Prefer Google's "Choose an account" screen over any (possibly hidden)
     // email input. The chooser renders progressively, so wait until its
@@ -361,7 +357,6 @@
       if (input && isVisible(input)) return 'form';
       return null;
     }, 8000);
-    console.log('[SRM-Auto] email step resolved target:', target);
     if (!target || isHalted()) return;
 
     // Google "Choose an account" screen: auto-select the preferred saved
@@ -371,19 +366,16 @@
         ? await waitFor(() => findAccountChooserItem(preferred.email))
         : null;
       if (card) {
-        console.log('[SRM-Auto] clicking preferred card:', card.tagName);
         clickAccountCard(card);
         toast(`Signing in as ${preferred.email}...`);
         return;
       }
       const anySrm = await waitFor(() => findFirstSrmChooserItem());
       if (anySrm) {
-        console.log('[SRM-Auto] clicking fallback SRM card:', anySrm.tagName);
         clickAccountCard(anySrm);
         toast('Signing in...');
         return;
       }
-      console.log('[SRM-Auto] chooser visible but no SRM card found');
       toast('No SRM account found on chooser');
       return;
     }
@@ -431,7 +423,6 @@
    * STEP 2.7: URL Router (stage machine)
    * ------------------------------------------------------------------ */
   const route = () => {
-    console.log('[SRM-Auto] route', location.href);
     if (isHalted()) return;
     if (isChallengeScreen()) {
       toast('2FA detected - login paused');
