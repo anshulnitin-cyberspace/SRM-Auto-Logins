@@ -22,6 +22,7 @@
     '/ServiceLogin',
     '/InteractiveLogin',
     '/AccountChooser',
+    '/accountchooser',
     '/SignInOptions'
   ];
   const BARE_LOGIN_URL = /^https:\/\/accounts\.google\.com\/?(\?.*)?$/;
@@ -70,6 +71,7 @@
       url.includes('/challenge/pwd') ||
       url.includes('/signin/v2/sl/pwd') ||
       url.includes('/identifier') ||
+      url.includes('/accountchooser') ||
       BARE_LOGIN_URL.test(url)
     ) {
       return false;
@@ -449,6 +451,7 @@
       url.includes('/ServiceLogin') ||
       url.includes('/InteractiveLogin') ||
       url.includes('/AccountChooser') ||
+      url.includes('/accountchooser') ||
       url.includes('/SignInOptions') ||
       BARE_LOGIN_URL.test(url)
     ) {
