@@ -1,45 +1,30 @@
 /*
- * SRM Auto Login Ultra - High-Performance Engine
- * Event-driven, zero-polling auto-login for SRM Google accounts.
- * Runs at document_start, exits in <1ms on valid sessions, and uses a
- * MutationObserver (never setInterval) to ride SPA step transitions.
+ * SRM Auto Login Ultra - High-Performance Google Auth Engine
+ * Event-driven, zero-polling auto-login for SRMIST Google accounts.
+ * Runs at document_start, exits in <1ms on valid sessions, and rides
+ * Google's SPA step transitions via MutationObserver (never setInterval).
  */
-(() => {
+(async () => {
   'use strict';
 
   /* ------------------------------------------------------------------ *
    * STEP 2.1: Immediate Fast-Exit Guard (sub-millisecond)
    * ------------------------------------------------------------------ */
   const CURRENT_URL = window.location.href;
+  const LOGIN_PATH_MARKERS = ['/signin/', '/v3/signin/', '/ServiceLogin', '/InteractiveLogin'];
 
-  // Already inside an active Google session -> never touch the DOM.
-  const ACTIVE_SESSION_PATHS = ['/mail/u/0/', '/drive/u/0/', 'myaccount.google.com'];
-  // Only proceed on pages that look like a login flow.
-  const LOGIN_PATH_MARKERS = [
-    '/signin/',
-    '/v3/signin/',
-    '/ServiceLogin',
-    '/InteractiveLogin',
-    '/youLogin.jsp'
-  ];
-
-  if (ACTIVE_SESSION_PATHS.some((m) => CURRENT_URL.includes(m))) return;
-  if (!LOGIN_PATH_MARKERS.some((m) => CURRENT_URL.includes(m))) return;
-
-  // DOM already shows signed-in chrome -> terminate before touching anything.
+  // Non-login URL -> return before touching the DOM.
+  if (!LOGIN_PATH_MARKERS.some((marker) => CURRENT_URL.includes(marker))) return;
+  // Already an active Google session / signed-in chrome -> terminate immediately.
   if (document.querySelector('#gb, a[aria-label*="Google Account"]')) return;
 
   /* ------------------------------------------------------------------ *
    * STEP 2.2: Native Value Setter
-   * Overrides the prototype setters Google/React/Angular hijack so that
-   * .value assignments are actually observed by the SPA framework.
+   * Beats the prototype overrides Google's SPA applies to .value so the
+   * framework actually observes the injected credentials.
    * ------------------------------------------------------------------ */
   const injectNativeValue = (element, value) => {
-    const proto =
-      element instanceof window.HTMLTextAreaElement
-        ? window.HTMLTextAreaElement.prototype
-        : window.HTMLInputElement.prototype;
-    const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
     if (setter) setter.call(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
@@ -58,27 +43,19 @@
       );
     });
 
-  // True on SRM portals (sp.srmist.edu.in, *.srmist.edu.in); false on accounts.google.com.
-  const IS_SRM_PORTAL = /(^|\.)srmist\.edu\.in$/.test(window.location.hostname);
-
-  // Raw NetID ("ab1234") -> full SRM email for standard Google login fields.
-  // SRM-specific NetID portals keep the raw NetID untouched.
-  const formatUsername = (username, useEmailDomain) => {
-    if (!username) return '';
-    if (useEmailDomain && !username.includes('@')) return username + '@srmist.edu.in';
-    return username;
-  };
+  // Raw 6-char NetID ("ab1234") -> full SRM email; full emails kept as-is.
+  const formatEmail = (username) =>
+    username.includes('@') ? username : username + '@srmist.edu.in';
 
   /* ------------------------------------------------------------------ *
-   * STEP 2.4: Fast-Path Fill + Dynamic Observation (SPA handling)
+   * STEP 2.4: Google Auth SPA Step Machine
    * ------------------------------------------------------------------ */
-  const EMAIL_SELECTOR =
-    'input[type="email"], #identifierId, input[name="identifier"], ' +
-    'input[name="username"], input[id*="User"]';
+  const EMAIL_SELECTOR = 'input[type="email"], #identifierId, input[name="identifier"]';
   const PASSWORD_SELECTOR =
     'input[type="password"], input[name="password"], input[name="Passwd"]';
 
   let observer = null;
+  let submitted = false;
 
   const stopObservation = () => {
     if (observer) {
@@ -87,69 +64,51 @@
     }
   };
 
-  const attemptFill = ({ username, password } = {}) => {
+  const attemptFill = ({ username, password }) => {
     // Signed-in chrome appeared without any login form -> stop watching.
     if (document.querySelector('#gb, a[aria-label*="Google Account"]')) {
       stopObservation();
+      submitted = true;
       return;
     }
 
     const emailInput = document.querySelector(EMAIL_SELECTOR);
     const passwordInput = document.querySelector(PASSWORD_SELECTOR);
-    const emailValue = emailInput ? formatUsername(username, !IS_SRM_PORTAL) : null;
-    const passwordValue = passwordInput ? password : null;
 
-    // Single-form portals: username + password visible on the same page.
-    if (emailInput && passwordInput) {
-      if (emailValue && !emailInput.value) injectNativeValue(emailInput, emailValue);
-      if (passwordValue && !passwordInput.value) injectNativeValue(passwordInput, passwordValue);
-      const submit = document.querySelector(
-        '#passwordNext, #passwordNext button, #submit, button[type="submit"], input[type="submit"]'
-      );
-      if (submit) submit.click();
-      stopObservation(); // final step complete.
-      return;
-    }
-
-    // Google SPA, email/NetID step.
-    if (emailInput && emailValue && !emailInput.value) {
-      injectNativeValue(emailInput, emailValue);
-      const next = document.querySelector(
-        '#identifierNext, #identifierNext button, button[type="button"], input[type="submit"]'
-      );
-      if (next) next.click();
-      // Keep observing: Google SPA swaps to the password step in-place.
-      return;
-    }
-
-    // Google SPA, password step.
-    if (passwordInput && passwordValue && !passwordInput.value) {
-      injectNativeValue(passwordInput, passwordValue);
-      const submit = document.querySelector(
-        '#passwordNext, #passwordNext button, #submit, button[type="submit"], input[type="submit"]'
-      );
+    // PASSWORD STEP: fill and submit, then release the observer.
+    if (passwordInput && password && !passwordInput.value) {
+      injectNativeValue(passwordInput, password);
+      const submit = document.querySelector('#passwordNext, button[type="button"]');
       if (submit) {
         submit.click();
-        stopObservation(); // filled + submitted: stop observation to prevent leaks.
+        submitted = true;
       }
+      stopObservation(); // final step completed -> free main-thread memory.
+      return;
+    }
+
+    // EMAIL / IDENTIFIER STEP: fill, advance to the password step in-place.
+    if (emailInput && username && !emailInput.value) {
+      injectNativeValue(emailInput, formatEmail(username));
+      const next = document.querySelector('#identifierNext, button[type="button"]');
+      if (next) setTimeout(() => next.click(), 100); // micro-delay for SPA to register input.
     }
   };
 
-  const begin = () => {
-    getCredentials().then(({ username, password }) => {
-      if (!username || !password) return; // no saved credentials -> clean exit.
+  const begin = async () => {
+    const { username, password } = await getCredentials();
+    if (!username || !password) return; // no saved credentials -> clean exit.
 
-      attemptFill({ username, password });
+    attemptFill({ username, password });
 
-      // Fields not rendered yet -> observe DOM until the target inputs appear.
-      if (!observer) {
-        observer = new MutationObserver(() => attemptFill({ username, password }));
-        observer.observe(document.documentElement, { childList: true, subtree: true });
-      }
-    });
+    // Target inputs not rendered yet -> watch for SPA step transitions.
+    if (!submitted) {
+      observer = new MutationObserver(() => attemptFill({ username, password }));
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    }
   };
 
-  // document_start fires before the DOM exists; also retry once when it is ready.
+  // document_start fires before the DOM exists; wait for it when needed.
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', begin, { once: true });
   } else {
