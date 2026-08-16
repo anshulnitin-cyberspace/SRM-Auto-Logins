@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔐 SRM Auto Login Ultra
+# 🔐 SRM Swift Sign-In
 
 One-click auto-login for your **SRMIST Google account** — a lightweight, privacy-first Chrome extension that fills your SRM credentials and signs you into Gmail automatically.
 
@@ -31,7 +31,7 @@ One-click auto-login for your **SRMIST Google account** — a lightweight, priva
 ## 📁 Project Structure
 
 ```text
-srm-auto-login-ultra/
+srm-swift-sign-in/
 ├── manifest.json          # MV3 manifest (storage permission only)
 ├── background.js          # Startup worker: opens Google login → Gmail
 ├── content.js             # Auto-login engine & Google chooser auto-select
@@ -77,18 +77,18 @@ Google's "Choose an account" screen renders progressively, so the engine **waits
 
 ### Option A — Download the Release (Recommended)
 
-1. Grab the latest `srm-auto-login-ultra-v*.zip` from the [Releases](https://github.com/anshulnitin-cyberspace/SRM-Auto-Logins/releases) section.
-2. Unzip it — you'll get a folder named `srm-auto-login-ultra` containing `manifest.json`.
+1. Grab the latest `srm-swift-sign-in-v*.zip` from the [Releases](https://github.com/anshulnitin-cyberspace/SRM-Swift-Sign-In/releases) section.
+2. Unzip it — you'll get a folder named `srm-swift-sign-in` containing `manifest.json`.
 3. Open **`chrome://extensions`** (or `edge://extensions`), toggle **Developer mode** on.
 4. Click **Load unpacked** and select that folder.
 
 ### Option B — Clone & Load
 
 ```bash
-git clone https://github.com/anshulnitin-cyberspace/SRM-Auto-Logins.git
+git clone https://github.com/anshulnitin-cyberspace/SRM-Swift-Sign-In.git
 ```
 
-Then follow steps 3–4 above using the `srm-auto-login-ultra/` folder from the clone.
+Then follow steps 3–4 above using the `srm-swift-sign-in/` folder from the clone.
 
 ---
 

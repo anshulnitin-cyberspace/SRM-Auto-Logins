@@ -1,4 +1,4 @@
-/* SRM Auto Login Ultra - Shared Storage Layer
+/* SRM Swift Sign-In - Shared Storage Layer
  * Loaded before content.js and popup.js. Single source of truth for
  * credential encoding, normalization, and chrome.storage.local access.
  */

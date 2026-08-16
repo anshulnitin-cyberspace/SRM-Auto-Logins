@@ -1,5 +1,5 @@
 /*
- * SRM Auto Login Ultra - Startup Auto-Login Worker
+ * SRM Swift Sign-In - Startup Auto-Login Worker
  * Opens the Google sign-in page (continue -> Gmail) once per browser
  * launch via chrome.runtime.onStartup. The content script then picks the
  * active session on Google's account chooser or runs the default password

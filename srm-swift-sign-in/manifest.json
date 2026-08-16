@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SRM Auto Login Ultra",
+  "name": "SRM Swift Sign-In",
   "version": "1.0",
   "description": "Hyper-fast, lightweight auto-login extension for SRM Google Accounts.",
   "permissions": ["storage"],

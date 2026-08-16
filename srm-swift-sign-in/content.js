@@ -1,5 +1,5 @@
 /*
- * SRM Auto Login Ultra - High-Performance Google Auth Engine
+ * SRM Swift Sign-In - High-Performance Google Auth Engine
  * Event-driven (single MutationObserver), zero-polling auto-login for
  * SRMIST Google accounts. Runs at document_start, exits in <1ms on valid
  * sessions, and rides SPA step transitions without setInterval loops.

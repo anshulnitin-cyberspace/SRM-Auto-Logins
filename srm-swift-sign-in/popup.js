@@ -1,4 +1,4 @@
-/* SRM Auto Login Ultra - Multi-Account Storage Controller */
+/* SRM Swift Sign-In - Multi-Account Storage Controller */
 (() => {
   'use strict';
 
