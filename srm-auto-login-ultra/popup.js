@@ -11,11 +11,13 @@
   const status = $('status');
   const accountsSection = $('accountsSection');
   const accountList = $('accountList');
+  const accountsToggle = $('accountsToggle');
 
   let accounts = [];
   let activeAccountId = '';
   let editingId = '';
   let statusTimer = null;
+  let accountsOpen = false;
 
   const showStatus = (message, kind = 'ok') => {
     status.textContent = message;
@@ -186,6 +188,12 @@
       .replace(/[^a-z0-9]/g, '')
       .slice(0, 6);
     if (srmIdInput.value !== cleaned) srmIdInput.value = cleaned;
+  });
+
+  accountsToggle.addEventListener('click', () => {
+    accountsOpen = !accountsOpen;
+    accountList.hidden = !accountsOpen;
+    accountsToggle.setAttribute('aria-expanded', String(accountsOpen));
   });
 
   load();

@@ -4,14 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SRM Auto Login Ultra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playwrite+DE+SAS+Guides&display=swap" rel="stylesheet">
   <style>
-    :root { color-scheme: light dark; }
+    :root { color-scheme: light; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       width: 320px;
       padding: 16px;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: #ffffff;
+      font-family: "Playwrite DE SAS Guides", "Segoe Script", "Comic Sans MS", cursive, system-ui, sans-serif;
+      background: #f1f3f5;
       color: #1f2328;
     }
     h1 {
@@ -66,15 +69,18 @@
       padding: 9px 0;
       border: none;
       border-radius: 6px;
-      background: #0969da;
+      background: linear-gradient(135deg, #6cc8f2 0%, #63e0b4 100%);
       color: #ffffff;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       font-family: inherit;
       cursor: pointer;
-      transition: background 0.15s ease;
+      transition: filter 0.15s ease, box-shadow 0.15s ease;
     }
-    #saveBtn:hover { background: #0958c9; }
+    #saveBtn:hover {
+      filter: brightness(0.96);
+      box-shadow: 0 1px 4px rgba(31, 108, 120, 0.25);
+    }
     #status {
       min-height: 16px;
       margin-top: 10px;
@@ -85,20 +91,36 @@
     }
     #status.ok { color: #1a7f37; }
     #status.err { color: #d1242f; }
-    #accountsSection { margin-top: 16px; border-top: 1px solid #d8dee4; padding-top: 12px; }
-    #accountsSection h2 {
+    #accountsSection { margin-top: 16px; border-top: 1px solid #d8dee4; padding-top: 4px; }
+    #accountsToggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border: none;
+      background: transparent;
+      color: #57606a;
+      font: inherit;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      color: #57606a;
-      margin-bottom: 8px;
+      cursor: pointer;
     }
+    #accountsToggle:hover { color: #1f2328; }
+    .chevron {
+      display: inline-block;
+      font-size: 10px;
+      transition: transform 0.2s ease;
+    }
+    #accountsToggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+    #accountList { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    #accountList[hidden] { display: none; }
     .acc-row {
       padding: 8px 10px;
       border: 1px solid #d0d7de;
       border-radius: 6px;
-      margin-bottom: 8px;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -131,20 +153,6 @@
       line-height: 1.4;
       color: #656d76;
     }
-    @media (prefers-color-scheme: dark) {
-      body { background: #0d1117; color: #e6edf3; }
-      input {
-        background: #161b22;
-        border-color: #30363d;
-      }
-      #accountsSection { border-top-color: #30363d; }
-      #accountsSection h2 { color: #8b949e; }
-      .acc-row { border-color: #30363d; }
-      .acc-meta { color: #8b949e; }
-      .acc-btn { border-color: #30363d; }
-      #togglePw { color: #8b949e; }
-      .note { color: #8b949e; }
-    }
   </style>
 </head>
 <body>
@@ -167,8 +175,11 @@
   <div id="status" role="status" aria-live="polite"></div>
 
   <section id="accountsSection" hidden>
-    <h2>Saved accounts</h2>
-    <div id="accountList"></div>
+    <button id="accountsToggle" type="button" aria-expanded="false">
+      <span>Saved accounts</span>
+      <span class="chevron">▾</span>
+    </button>
+    <div id="accountList" hidden></div>
   </section>
 
   <p class="note">Credentials never leave this device. The extension only runs on accounts.google.com.</p>
