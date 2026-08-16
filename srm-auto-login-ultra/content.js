@@ -48,8 +48,12 @@
   /* ------------------------------------------------------------------ *
    * STEP 2.3: Session Guards
    * ------------------------------------------------------------------ */
-  const isHalted = () => sessionStorage.getItem('srm_autologin_halted') === '1';
-  const haltSession = () => sessionStorage.setItem('srm_autologin_halted', '1');
+  const HALT_MS = 5 * 60 * 1000; // brief pause after a wrong password; self-heals
+  const isHalted = () => {
+    const t = Number(sessionStorage.getItem('srm_autologin_halted') || 0);
+    return t > 0 && Date.now() - t < HALT_MS;
+  };
+  const haltSession = () => sessionStorage.setItem('srm_autologin_halted', String(Date.now()));
 
   const CHALLENGE_SELECTORS = [
     '#totpPin',
@@ -235,7 +239,26 @@
         if (netId && haystack.includes(netId)) return el;
       }
     }
-    return null;
+    return findByEmailText(normalized);
+  };
+
+  // Last-resort scan for the account card via its visible email text.
+  const findByEmailText = (email) => {
+    const normalized = normalizeEmail(email);
+    const netId = normalized.replace('@srmist.edu.in', '');
+    let best = null;
+    let bestLen = Infinity;
+    for (const el of document.querySelectorAll('div, li, a, button, span')) {
+      if (el.children.length) continue;
+      const t = (el.textContent || '').trim();
+      if (!t) continue;
+      const lower = t.toLowerCase();
+      if (lower.includes('@srmist.edu.in') && lower.includes(netId) && t.length < bestLen) {
+        best = el;
+        bestLen = t.length;
+      }
+    }
+    return best;
   };
 
   // First chooser card that carries an SRM-domain session (no saved match).
@@ -248,7 +271,18 @@
         if (`${dataId} ${text}`.toLowerCase().includes('srmist.edu.in')) return el;
       }
     }
+    for (const el of document.querySelectorAll('div, li, a, button, span')) {
+      if (el.children.length) continue;
+      const t = (el.textContent || '').trim();
+      if (t && t.toLowerCase().includes('@srmist.edu.in')) return el;
+    }
     return null;
+  };
+
+  // A chooser screen always carries a "Choose an account" heading.
+  const hasChooserHeading = () => {
+    const h1 = qs('h1');
+    return !!(h1 && /choose an account/i.test(h1.textContent || ''));
   };
 
   // Click that survives Google's custom UI handlers (click + Enter keys).
@@ -304,18 +338,28 @@
     if (isHalted()) return;
     const { accounts, activeAccountId } = await loadAccounts();
     const enabled = accounts.filter((a) => a.enabled !== false && a.email && a.password);
-    if (!enabled.length) return;
+    if (!enabled.length) {
+      console.log('[SRM-Auto] email step: no enabled saved accounts');
+      return;
+    }
     const preferred = pickPreferred(enabled, activeAccountId);
+    console.log('[SRM-Auto] email step on', location.href, '| preferred:', preferred && preferred.email);
 
     // Prefer Google's "Choose an account" screen over any (possibly hidden)
     // email input. The chooser renders progressively, so wait until its
     // markers actually exist.
     const target = await waitFor(() => {
-      if (qs('[data-identifier], [data-email], [data-authuser], .W7322c')) return 'chooser';
+      if (
+        qs('[data-identifier], [data-email], [data-authuser], .W7322c') ||
+        hasChooserHeading()
+      ) {
+        return 'chooser';
+      }
       const input = qs('input[type="email"]');
       if (input && isVisible(input)) return 'form';
       return null;
-    });
+    }, 8000);
+    console.log('[SRM-Auto] email step resolved target:', target);
     if (!target || isHalted()) return;
 
     // Google "Choose an account" screen: auto-select the preferred saved
@@ -325,16 +369,19 @@
         ? await waitFor(() => findAccountChooserItem(preferred.email))
         : null;
       if (card) {
+        console.log('[SRM-Auto] clicking preferred card:', card.tagName);
         clickAccountCard(card);
         toast(`Signing in as ${preferred.email}...`);
         return;
       }
       const anySrm = await waitFor(() => findFirstSrmChooserItem());
       if (anySrm) {
+        console.log('[SRM-Auto] clicking fallback SRM card:', anySrm.tagName);
         clickAccountCard(anySrm);
         toast('Signing in...');
         return;
       }
+      console.log('[SRM-Auto] chooser visible but no SRM card found');
       toast('No SRM account found on chooser');
       return;
     }
@@ -382,6 +429,7 @@
    * STEP 2.7: URL Router (stage machine)
    * ------------------------------------------------------------------ */
   const route = () => {
+    console.log('[SRM-Auto] route', location.href);
     if (isHalted()) return;
     if (isChallengeScreen()) {
       toast('2FA detected - login paused');
