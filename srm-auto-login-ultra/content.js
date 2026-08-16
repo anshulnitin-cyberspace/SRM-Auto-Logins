@@ -210,7 +210,14 @@
    * Google's "Choose an account" screen lists signed-out accounts in
    * cards carrying data-identifier / data-email or the email in text.
    * ------------------------------------------------------------------ */
-  const CHOOSER_SELECTORS = ['[data-identifier]', '[data-email]', '.W7322c', '[role="link"]', 'li'];
+  const CHOOSER_SELECTORS = [
+    '[data-identifier]',
+    '[data-email]',
+    '[data-authuser]',
+    '.W7322c',
+    '[role="link"]',
+    'li'
+  ];
 
   const findAccountChooserItem = (email) => {
     const normalized = normalizeEmail(email);
@@ -258,6 +265,21 @@
     }));
   };
 
+  // Click the card's clickable container (data-authuser / data-identifier / li).
+  const clickAccountCard = (el) => {
+    const card =
+      el && el.closest
+        ? el.closest('[data-authuser], [data-identifier], [data-email], li') || el
+        : el;
+    nativeClick(card);
+  };
+
+  const isVisible = (el) => {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+
   /* ------------------------------------------------------------------ *
    * STEP 2.6: Flow Steps
    * ------------------------------------------------------------------ */
@@ -285,34 +307,35 @@
     if (!enabled.length) return;
     const preferred = pickPreferred(enabled, activeAccountId);
 
-    // Wait for whichever renders first: the login form input, the preferred
-    // account card on Google's chooser, or the chooser itself. Predicate-based
-    // so it resolves exactly when the target element actually exists.
+    // Prefer Google's "Choose an account" screen over any (possibly hidden)
+    // email input. The chooser renders progressively, so wait until its
+    // markers actually exist.
     const target = await waitFor(() => {
+      if (qs('[data-identifier], [data-email], [data-authuser], .W7322c')) return 'chooser';
       const input = qs('input[type="email"]');
-      if (input) return input;
-      if (preferred) {
-        const card = findAccountChooserItem(preferred.email);
-        if (card) return card;
-      }
-      return qs('[data-identifier], [data-email], .W7322c') ? true : null;
+      if (input && isVisible(input)) return 'form';
+      return null;
     });
     if (!target || isHalted()) return;
 
-    // Chooser present but the preferred card is not listed -> any SRM session.
-    if (target === true) {
+    // Google "Choose an account" screen: auto-select the preferred saved
+    // account; fall back to the first available SRM-domain session.
+    if (target === 'chooser') {
+      const card = preferred
+        ? await waitFor(() => findAccountChooserItem(preferred.email))
+        : null;
+      if (card) {
+        clickAccountCard(card);
+        toast(`Signing in as ${preferred.email}...`);
+        return;
+      }
       const anySrm = await waitFor(() => findFirstSrmChooserItem());
       if (anySrm) {
-        nativeClick(anySrm);
+        clickAccountCard(anySrm);
         toast('Signing in...');
+        return;
       }
-      return;
-    }
-
-    // Preferred account card matched -> select it; the SPA advances to password.
-    if (target.matches && target.matches('input[type="email"]') === false) {
-      nativeClick(target);
-      toast('Signing in...');
+      toast('No SRM account found on chooser');
       return;
     }
 
