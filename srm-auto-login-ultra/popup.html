@@ -27,6 +27,7 @@
       margin: 10px 0 4px;
       color: inherit;
     }
+    .field-row { position: relative; }
     input {
       width: 100%;
       padding: 8px 10px;
@@ -43,6 +44,22 @@
       border-color: #0969da;
       box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.25);
     }
+    .pw-wrap { position: relative; }
+    #pwInput { padding-right: 46px; }
+    #togglePw {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 4px 6px;
+      font-size: 11px;
+      border: none;
+      background: transparent;
+      color: #57606a;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #togglePw:hover { color: #0969da; }
     #saveBtn {
       width: 100%;
       margin-top: 14px;
@@ -62,11 +79,52 @@
       min-height: 16px;
       margin-top: 10px;
       font-size: 12px;
-      color: #1a7f37;
       text-align: center;
       opacity: 0;
       transition: opacity 0.4s ease;
     }
+    #status.ok { color: #1a7f37; }
+    #status.err { color: #d1242f; }
+    #accountsSection { margin-top: 16px; border-top: 1px solid #d8dee4; padding-top: 12px; }
+    #accountsSection h2 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #57606a;
+      margin-bottom: 8px;
+    }
+    .acc-row {
+      padding: 8px 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .acc-email {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .acc-meta { font-size: 11px; color: #656d76; }
+    .acc-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .acc-btn {
+      font-size: 11px;
+      padding: 3px 8px;
+      border: 1px solid #d0d7de;
+      border-radius: 4px;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.15s ease, color 0.15s ease;
+    }
+    .acc-btn:hover { border-color: #0969da; color: #0969da; }
+    .acc-btn.danger:hover { border-color: #d1242f; color: #d1242f; }
     .note {
       margin-top: 12px;
       font-size: 11px;
@@ -79,22 +137,43 @@
         background: #161b22;
         border-color: #30363d;
       }
+      #accountsSection { border-top-color: #30363d; }
+      #accountsSection h2 { color: #8b949e; }
+      .acc-row { border-color: #30363d; }
+      .acc-meta { color: #8b949e; }
+      .acc-btn { border-color: #30363d; }
+      #togglePw { color: #8b949e; }
       .note { color: #8b949e; }
     }
   </style>
 </head>
 <body>
   <h1>SRM Auto Login Ultra</h1>
+
   <form id="credForm" novalidate>
-    <label for="username">NetID or SRM Email</label>
-    <input id="username" type="text" placeholder="NetID (e.g. ab1234) or Full Email"
+    <label for="srmId">NetID</label>
+    <input id="srmId" type="text" placeholder="e.g. ab1234" maxlength="20"
            autocomplete="username" spellcheck="false" autocapitalize="off">
-    <label for="password">Password</label>
-    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
-    <button id="saveBtn" type="button">Save Credentials</button>
+
+    <label for="pwInput">Password</label>
+    <div class="pw-wrap">
+      <input id="pwInput" type="password" placeholder="Password" autocomplete="current-password">
+      <button id="togglePw" type="button">Show</button>
+    </div>
+
+    <button id="saveBtn" type="button">Save account</button>
   </form>
+
   <div id="status" role="status" aria-live="polite"></div>
-  <p class="note">Credentials are stored locally on this device only.</p>
+
+  <section id="accountsSection" hidden>
+    <h2>Saved accounts</h2>
+    <div id="accountList"></div>
+  </section>
+
+  <p class="note">Credentials never leave this device. The extension only runs on accounts.google.com.</p>
+
+  <script src="shared/storage.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

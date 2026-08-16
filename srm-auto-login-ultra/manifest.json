@@ -7,7 +7,7 @@
   "content_scripts": [
     {
       "matches": ["https://accounts.google.com/*"],
-      "js": ["content.js"],
+      "js": ["shared/storage.js", "content.js"],
       "run_at": "document_start",
       "all_frames": false
     }
