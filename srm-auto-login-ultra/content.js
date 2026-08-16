@@ -16,7 +16,14 @@
    * STEP 2.1: Immediate Fast-Exit Guard (sub-millisecond)
    * ------------------------------------------------------------------ */
   const CURRENT_URL = location.href;
-  const LOGIN_PATH_MARKERS = ['/signin/', '/v3/signin/', '/ServiceLogin', '/InteractiveLogin'];
+  const LOGIN_PATH_MARKERS = [
+    '/signin/',
+    '/v3/signin/',
+    '/ServiceLogin',
+    '/InteractiveLogin',
+    '/AccountChooser',
+    '/SignInOptions'
+  ];
   const BARE_LOGIN_URL = /^https:\/\/accounts\.google\.com\/?(\?.*)?$/;
 
   if (!LOGIN_PATH_MARKERS.some((m) => CURRENT_URL.includes(m)) && !BARE_LOGIN_URL.test(CURRENT_URL)) {
@@ -121,6 +128,30 @@
       const el = qs(w.selector);
       if (el) w.done(el);
     }
+    for (const w of [...pendingPredicates]) {
+      const value = w.predicate();
+      if (value) w.done(value);
+    }
+  };
+
+  // Predicate waiter: resolved by the observer whenever predicate() becomes
+  // truthy. One-shot timeout is a safety bound, never a polling loop.
+  const pendingPredicates = new Set();
+  const waitFor = (predicate, timeout = 6000) => {
+    const hit = predicate();
+    if (hit) return Promise.resolve(hit);
+    return new Promise((resolve) => {
+      const waiter = {
+        predicate,
+        done: (value) => {
+          clearTimeout(waiter.timer);
+          pendingPredicates.delete(waiter);
+          resolve(value);
+        },
+        timer: setTimeout(() => waiter.done(null), timeout)
+      };
+      pendingPredicates.add(waiter);
+    });
   };
 
   /* Displayed email detection for multi-account matching. */
@@ -179,7 +210,7 @@
    * Google's "Choose an account" screen lists signed-out accounts in
    * cards carrying data-identifier / data-email or the email in text.
    * ------------------------------------------------------------------ */
-  const CHOOSER_SELECTORS = ['[data-identifier]', '.W7322c', '[role="link"]', 'li'];
+  const CHOOSER_SELECTORS = ['[data-identifier]', '[data-email]', '.W7322c', '[role="link"]', 'li'];
 
   const findAccountChooserItem = (email) => {
     const normalized = normalizeEmail(email);
@@ -187,7 +218,8 @@
 
     for (const sel of CHOOSER_SELECTORS) {
       for (const el of document.querySelectorAll(sel)) {
-        const dataId = el.getAttribute('data-identifier') || '';
+        const dataId =
+          el.getAttribute('data-identifier') || el.getAttribute('data-email') || '';
         const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
         const haystack = `${dataId} ${text}`.toLowerCase();
         if (!haystack.includes('srmist.edu.in')) continue;
@@ -203,7 +235,8 @@
   const findFirstSrmChooserItem = () => {
     for (const sel of CHOOSER_SELECTORS) {
       for (const el of document.querySelectorAll(sel)) {
-        const dataId = el.getAttribute('data-identifier') || '';
+        const dataId =
+          el.getAttribute('data-identifier') || el.getAttribute('data-email') || '';
         const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
         if (`${dataId} ${text}`.toLowerCase().includes('srmist.edu.in')) return el;
       }
@@ -250,30 +283,40 @@
     const { accounts, activeAccountId } = await loadAccounts();
     const enabled = accounts.filter((a) => a.enabled !== false && a.email && a.password);
     if (!enabled.length) return;
-
-    // Wait for either the login form or Google's "Choose an account" screen.
-    const first = await waitForSelector('input[type="email"], [data-identifier], .W7322c');
-    if (!first || isHalted()) return;
-
-    // Google "Choose an account" screen: auto-select the preferred saved account.
     const preferred = pickPreferred(enabled, activeAccountId);
-    if (preferred) {
-      const item = findAccountChooserItem(preferred.email);
-      if (item) {
-        nativeClick(item);
-        toast('Signing in...');
-        return;
+
+    // Wait for whichever renders first: the login form input, the preferred
+    // account card on Google's chooser, or the chooser itself. Predicate-based
+    // so it resolves exactly when the target element actually exists.
+    const target = await waitFor(() => {
+      const input = qs('input[type="email"]');
+      if (input) return input;
+      if (preferred) {
+        const card = findAccountChooserItem(preferred.email);
+        if (card) return card;
       }
+      return qs('[data-identifier], [data-email], .W7322c') ? true : null;
+    });
+    if (!target || isHalted()) return;
+
+    // Chooser present but the preferred card is not listed -> any SRM session.
+    if (target === true) {
+      const anySrm = await waitFor(() => findFirstSrmChooserItem());
+      if (anySrm) {
+        nativeClick(anySrm);
+        toast('Signing in...');
+      }
+      return;
     }
 
-    // Saved account not listed -> use the first available SRM session.
-    const anySrm = findFirstSrmChooserItem();
-    if (anySrm) {
-      nativeClick(anySrm);
+    // Preferred account card matched -> select it; the SPA advances to password.
+    if (target.matches && target.matches('input[type="email"]') === false) {
+      nativeClick(target);
       toast('Signing in...');
       return;
     }
 
+    // Plain login form -> default fill path.
     await fillEmail(enabled[0]);
   };
 
@@ -334,6 +377,8 @@
       url.includes('/v3/signin/identifier') ||
       url.includes('/ServiceLogin') ||
       url.includes('/InteractiveLogin') ||
+      url.includes('/AccountChooser') ||
+      url.includes('/SignInOptions') ||
       BARE_LOGIN_URL.test(url)
     ) {
       handleEmailStep();
