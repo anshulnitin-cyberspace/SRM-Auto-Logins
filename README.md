@@ -16,6 +16,12 @@ One-click auto-login for your **SRMIST Google account** — a lightweight, priva
 
 ---
 
+## 🖼️ Preview
+
+![SRM Swift Sign-In popup](assets/popup-preview.png)
+
+---
+
 ## ✨ Features
 
 - ⚡ **Zero-Touch Sign-In** — Opens Google login on every Chrome startup and auto-signs you into Gmail with your saved SRM account.
